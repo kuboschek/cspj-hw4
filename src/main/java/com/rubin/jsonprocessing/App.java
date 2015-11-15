@@ -155,6 +155,7 @@ public class App {
                 
                 System.out.println(String.format("%d flows queued for annotation", num_flows));
                 
+                // Wait for annotation to be completed
                 while(!svc.isShutdown()) {
                 	try {
 						if(svc.awaitTermination(10, TimeUnit.SECONDS))
@@ -182,8 +183,7 @@ public class App {
                 	}
                 }
                 
-                
-                System.out.println("All flows annotated. Generating flow groups.");
+                System.out.println("All flows annotated. Grouping flows.");
                 
 
             } catch (FileNotFoundException e) {
