@@ -17,6 +17,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.TreeMap;
 
 /**
@@ -43,9 +47,14 @@ public class App {
         // Create a TreeMap<Long, Flowbin> for every filter
         createBinTreeMap(filters, binObjects);
 
+        // Create a thread pool for annotating objects in parallel
+        ExecutorService svc = Executors.newFixedThreadPool(4);
+        
         for (String arg : args) {
             JsonReader reader = null;
             try {
+            	int num_flows = 0;
+                int tasks_submitted = 0;
 
                 reader = new JsonReader(new FileReader(arg));
                 // We ecpect to have a list of json records
@@ -53,8 +62,16 @@ public class App {
                 reader.beginArray();
 
                 while (reader.hasNext()) {
-
+                	num_flows++;
+                	
                     Flow flow = gson.fromJson(reader, Flow.class);
+                    
+                    // Before anything else, annotate this flow with AS numbers.
+                    // This is async, thus we wait for completion of all threads after this loop
+                    svc.submit(new AnnotateFlowTask(flow, "src-as", new ASLookup(flow.getSip())));
+                    svc.submit(new AnnotateFlowTask(flow, "dst-as", new ASLookup(flow.getDip())));
+                    
+                    tasks_submitted += 2;
                     
                     // Get the start time of a flow, parse it and convert it 
                     // into milliseconds for more precision
@@ -135,6 +152,39 @@ public class App {
                     }
                 }
                 reader.endArray();
+                
+                System.out.println(String.format("%d flows queued for annotation", num_flows));
+                
+                while(!svc.isShutdown()) {
+                	try {
+						if(svc.awaitTermination(10, TimeUnit.SECONDS))
+							break;
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+ 
+                	ThreadPoolExecutor tpe = (ThreadPoolExecutor) svc;
+                	int done = tasks_submitted - tpe.getQueue().size();
+                	
+                	if(tasks_submitted - done == 0) {
+                		svc.shutdown();
+                	}
+                	
+                	// Keep user informed
+                	System.out.println(String.format("%d of %d annotations done.", done, tasks_submitted));
+                	
+                	// Only print cache info if miss ratio is large
+                	if(1 - ASLookup.getHitRatio() > 0.2) {
+	                	System.out.println(String.format("Miss ratio: %s (%s hits / %s queries)",
+	                			1 - ASLookup.getHitRatio(),
+	                			ASLookup.getNumHits(),
+	                			ASLookup.getNumQueries()));
+                	}
+                }
+                
+                
+                System.out.println("All flows annotated. Generating flow groups.");
+                
 
             } catch (FileNotFoundException e) {
                 e.printStackTrace(System.out);

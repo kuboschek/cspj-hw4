@@ -15,6 +15,12 @@ public class ASLookup implements Callable<ASInfo> {
 	private static final String baseURL = "https://stat.ripe.net/data/prefix-overview/data.json";
 	
 	/**
+	 * Simple cache performance tracking
+	 */
+	private static long hits = 0;
+	private static long queries = 0;
+	
+	/**
 	 * Sets the IP to be looked up when task is run.
 	 * @param ip The address to look up
 	 */
@@ -24,8 +30,12 @@ public class ASLookup implements Callable<ASInfo> {
 	
 	@Override
 	public ASInfo call() throws Exception {
+		// Performance tracking
+		queries += 1;
+		
 		// Don't run request when record is already available
 		if(cache.containsKey(queryIP)) {
+			hits += 1;
 			return cache.get(queryIP);
 		}
 		
@@ -44,10 +54,29 @@ public class ASLookup implements Callable<ASInfo> {
 			
 		in.close();
 		
-		ASInfo info = ASInfo.deserialize(response.toString());
+		ASInfo info = null;
+		
+		// Eat up the exception here, this means that flows without an AS number do not get annotated, since null is returned
+		try {
+			info = ASInfo.deserialize(response.toString());
+		} catch (Exception e) {
+		}
+		
+		// Cache the result even if there is no AS
 		cache.put(queryIP, info);
 		
 		return info;
 	}
 	
+	public static float getHitRatio() {
+		return queries == 0 ? 0 : (float) hits / (float) queries;
+	}
+	
+	public static long getNumHits() {
+		return hits;
+	}
+	
+	public static long getNumQueries() {
+		return queries;
+	}
 }

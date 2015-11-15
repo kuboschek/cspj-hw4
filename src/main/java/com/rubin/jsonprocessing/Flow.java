@@ -1,5 +1,8 @@
 package com.rubin.jsonprocessing;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -8,7 +11,10 @@ import com.google.gson.GsonBuilder;
  * @author rubin
  */
 public class Flow {
-
+	
+	// Mark as transient to exclude from serialization
+	private transient Map<String, Object> annotations = new HashMap<>();
+	
     /* Class attributes */
     private String start, end;
     private double duration, rtt;
@@ -63,6 +69,14 @@ public class Flow {
         roct -= (long) (f.roct * portion);
     }
 
+    public Object addAnnotation(String key, Object obj) {
+    	return annotations.put(key, obj);
+    }
+    
+    public Object getAnnotation(String key) {
+    	return annotations.get(key);
+    }
+    
     // Serializer
     public String toJson() {
         Gson gson = new GsonBuilder().serializeNulls().create();
@@ -94,6 +108,14 @@ public class Flow {
 
     public short getProto() {
         return proto;
+    }
+    
+    public String getDip() {
+    	return dip;
+    }
+    
+    public String getSip() {
+    	return sip;
     }
 
     public int getDp() {
