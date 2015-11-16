@@ -27,7 +27,15 @@ public class ASLookup implements Callable<ASInfo> {
 	public ASLookup(String ip) {
 		this.queryIP = ip;
 	}
-	
+
+	public static boolean isCached(String queryIP) {
+		return cache.containsKey(queryIP);
+	}
+
+	public static ASInfo getCache(String queryIP) {
+		return cache.get(queryIP);
+	}
+
 	@Override
 	public ASInfo call() throws Exception {
 		// Performance tracking
