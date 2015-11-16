@@ -164,10 +164,13 @@ public class App {
                 
                 System.out.println(String.format("%d flows queued for annotation", num_flows));
                 
+                
+                int old_value = 0;
+                
                 // Wait for annotation to be completed
                 while(!svc.isShutdown()) {
                 	try {
-						if(svc.awaitTermination(10, TimeUnit.SECONDS))
+						if(svc.awaitTermination(1, TimeUnit.SECONDS))
 							break;
 					} catch (InterruptedException e) {
 						e.printStackTrace();
@@ -181,19 +184,15 @@ public class App {
                 	}
                 	
                 	// Keep user informed
-                	System.out.println(String.format("%d of %d annotations done.", done, tasks_submitted));
+                	System.out.print(String.format("\r%d of %d, %d annotations / s", done, tasks_submitted, done - old_value));
                 	
-                	// Only print cache info if miss ratio is large
-                	if(1 - ASLookup.getHitRatio() > 0.2) {
-	                	System.out.println(String.format("Miss ratio: %s (%s hits / %s queries)",
-	                			1 - ASLookup.getHitRatio(),
-	                			ASLookup.getNumHits(),
-	                			ASLookup.getNumQueries()));
-                	}
+                	old_value = done;
                 }
                 
+                System.out.println();
                 System.out.println("All flows annotated. Grouping flows.");
 
+                // This flow grouper is arbitrary in implementation
                 FlowGrouper aspair  = new FlowGrouper() {
                     @Override
                     public String getKey(Flow f) {
