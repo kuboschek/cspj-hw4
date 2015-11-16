@@ -7,9 +7,10 @@ import java.net.URLConnection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ASLookup implements Callable<ASInfo> {
-	private static Map<String, ASInfo> cache = new HashMap<>();
+	private static Map<String, ASInfo> cache = new ConcurrentHashMap<>();
 	private String queryIP;
 	
 	private static final String baseURL = "https://stat.ripe.net/data/prefix-overview/data.json";
@@ -44,7 +45,10 @@ public class ASLookup implements Callable<ASInfo> {
 		// Don't run request when record is already available
 		if(cache.containsKey(queryIP)) {
 			hits += 1;
-			return cache.get(queryIP);
+			ASInfo info = cache.get(queryIP);
+			
+			// Special NULL_INFO exists to allow usage of concurrent map for cache.
+			return info.equals(ASInfo.NULL_INFO) ? null : info;
 		}
 		
 		URL url = new URL(baseURL + "?resource=" + queryIP);
@@ -71,7 +75,11 @@ public class ASLookup implements Callable<ASInfo> {
 		}
 		
 		// Cache the result even if there is no AS
-		cache.put(queryIP, info);
+		if(info != null) {
+			cache.put(queryIP, info);
+		} else {
+			cache.put(queryIP, ASInfo.NULL_INFO);
+		}
 		
 		return info;
 	}

@@ -8,6 +8,14 @@ public class ASInfo {
 	String holder;
 	String block;
 	
+	public static ASInfo NULL_INFO = new ASInfo(-1);
+	
+	private ASInfo(){};
+	
+	private ASInfo(int number) {
+		this.number = number;
+	}
+	
 	/**
 	 * 
 	 * @param json The API response as a string
