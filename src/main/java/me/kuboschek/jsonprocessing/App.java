@@ -184,7 +184,7 @@ public class App {
                 	}
                 	
                 	// Keep user informed
-                	System.out.print(String.format("\r%7d of %-7d\t%5d annotations/s", done, tasks_submitted, done - old_value));
+                	System.out.print(String.format("\r%10d of %d\t%5d annotations/s", done, tasks_submitted, done - old_value));
                 	
                 	old_value = done;
                 }
