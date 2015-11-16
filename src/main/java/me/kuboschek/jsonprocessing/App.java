@@ -74,8 +74,8 @@ public class App {
 
                     // Before anything else, annotate this flow with AS numbers.
                     // This is async, thus we wait for completion of all threads after this loop
-                    svc.submit(new AnnotateFlowTask(flow, "src-as", new ASLookup(flow.getSip())));
-                    svc.submit(new AnnotateFlowTask(flow, "dst-as", new ASLookup(flow.getDip())));
+                    svc.execute(new AnnotateFlowTask(flow, "src-as", new ASLookup(flow.getSip())));
+                    svc.execute(new AnnotateFlowTask(flow, "dst-as", new ASLookup(flow.getDip())));
 
                     tasks_submitted += 2;
 
