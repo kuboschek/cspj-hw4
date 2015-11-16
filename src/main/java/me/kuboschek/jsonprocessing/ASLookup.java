@@ -6,19 +6,13 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 public class ASLookup implements Callable<ASInfo> {
-	private static Map<String, ASInfo> cache = new ConcurrentHashMap<>();
+	private static Map<String, ASInfo> cache = new ConcurrentSkipListMap<>();
 	private String queryIP;
 	
 	private static final String baseURL = "https://stat.ripe.net/data/prefix-overview/data.json";
-	
-	/**
-	 * Simple cache performance tracking
-	 */
-	private static long hits = 0;
-	private static long queries = 0;
 	
 	/**
 	 * Sets the IP to be looked up when task is run.
@@ -38,15 +32,12 @@ public class ASLookup implements Callable<ASInfo> {
 
 	@Override
 	public ASInfo call() throws Exception {
-		// Performance tracking
-		queries += 1;
 		
 		// Don't run request when record is already available
-		if(cache.containsKey(queryIP)) {
-			hits += 1;
-			ASInfo info = cache.get(queryIP);
-			
+		ASInfo info = cache.get(queryIP);
+		
 			// Special NULL_INFO exists to allow usage of concurrent map for cache.
+		if(info != null) {
 			return info.equals(ASInfo.NULL_INFO) ? null : info;
 		}
 		
@@ -65,8 +56,6 @@ public class ASLookup implements Callable<ASInfo> {
 			
 		in.close();
 		
-		ASInfo info = null;
-		
 		// Eat up the exception here, this means that flows without an AS number do not get annotated, since null is returned
 		try {
 			info = ASInfo.deserialize(response.toString());
@@ -81,17 +70,5 @@ public class ASLookup implements Callable<ASInfo> {
 		}
 		
 		return info;
-	}
-	
-	public static float getHitRatio() {
-		return queries == 0 ? 0 : (float) hits / (float) queries;
-	}
-	
-	public static long getNumHits() {
-		return hits;
-	}
-	
-	public static long getNumQueries() {
-		return queries;
 	}
 }
