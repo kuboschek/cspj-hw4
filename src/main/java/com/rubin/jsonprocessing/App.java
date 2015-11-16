@@ -49,7 +49,7 @@ public class App {
         Map<String, FlowBin> groups = new HashMap<>();
 
         // Create a thread pool for annotating objects in parallel
-        ExecutorService svc = Executors.newFixedThreadPool(17);
+        ExecutorService svc = Executors.newFixedThreadPool(15);
 
         System.out.println(String.format("Processing %d file(s)", args.length));
 
@@ -245,9 +245,7 @@ public class App {
         writeToFile(binObjects);
 
         // Write flow groups stats to files
-        for(Map.Entry<String, FlowBin> e : groups.entrySet()) {
-            System.out.println(String.format("Group: %s, Size: %s", e.getKey(), e.getValue().getFlows()));
-        }
+        groupsToFile(groups);
 
         System.exit(0);
     }
@@ -386,16 +384,16 @@ public class App {
                 Quantile rpkts = bin.getRpktsStats();
                 // Printing the formated output for every Quantile object of
                 // the FlowBin
-                writer.printf("%-10d\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
+                writer.printf("%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
                         group, "octs", octs.getMin(), octs.getFirstQuantile(), octs.getMedian()
                         , octs.getThirdQuantile(), octs.getMax(), octs.getSize(), octs.getSum());
-                writer.printf("%-10d\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
+                writer.printf("%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
                         group, "pkts", pkts.getMin(), pkts.getFirstQuantile(), pkts.getMedian(),
                         pkts.getThirdQuantile(), pkts.getMax(), pkts.getSize(), pkts.getSum());
-                writer.printf("%-10d\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
+                writer.printf("%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
                         group, "rocts", rocts.getMin(), rocts.getFirstQuantile(), rocts.getMedian(),
                         rocts.getThirdQuantile(), rocts.getMax(), rocts.getSize(), rocts.getSum());
-                writer.printf("%-10d\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
+                writer.printf("%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
                         group, "rpkts", rpkts.getMin(), rpkts.getFirstQuantile(), rpkts.getMedian(),
                         rpkts.getThirdQuantile(), rpkts.getMax(), rpkts.getSize(), rpkts.getSum());
             }
