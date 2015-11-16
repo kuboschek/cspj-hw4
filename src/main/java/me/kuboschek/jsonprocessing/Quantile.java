@@ -21,7 +21,7 @@ public class Quantile {
         // after we insert the first element
         min = Long.MAX_VALUE;
         max = Long.MIN_VALUE;
-        ls = new ArrayList();
+        ls = new ArrayList<>();
     }
 
     // Adds a number to this quantile
