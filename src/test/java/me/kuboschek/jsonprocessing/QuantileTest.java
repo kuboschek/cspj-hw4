@@ -3,10 +3,12 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.rubin.jsonprocessing;
+package me.kuboschek.jsonprocessing;
 
 import static org.junit.Assert.assertEquals;
 import org.junit.Test;
+
+import me.kuboschek.jsonprocessing.Quantile;
 
 /**
  *

@@ -1,8 +1,10 @@
-package com.rubin.jsonprocessing;
+package me.kuboschek.jsonprocessing;
 
 import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
+
+import me.kuboschek.jsonprocessing.ASInfo;
 
 public class ASInfoTest {
 	static final String json1 = "{\"status\": \"ok\", \"server_id\": \"stat-app3\", \"status_code\": 200, \"version\": \"1.3\", \"cached\": false, \"see_also\": [], \"time\": \"2015-11-15T13:19:57.603087\", \"messages\": [[\"warning\", \"Given resource is not announced but result has been aligned to first-level less-specific (87.64.0.0/14).\"]], \"data_call_status\": \"supported - connecting to ursa\", \"process_time\": 465, \"query_id\": \"90deb39c-8b9b-11e5-a2bc-d4ae52a9c1b6\", \"data\": {\"query_time\": \"2015-11-15T08:00:00\", \"is_less_specific\": true, \"resource\": \"87.64.0.0/14\", \"actual_num_related\": 0, \"num_filtered_out\": 0, \"asns\": [{\"holder\": \"BELGACOM-SKYNET-AS Proximus NV,BE\", \"asn\": 5432}], \"block\": {\"resource\": \"87.0.0.0/8\", \"name\": \"IANA IPv4 Address Space Registry\", \"desc\": \"RIPE NCC (Status: ALLOCATED)\"}, \"related_prefixes\": [], \"type\": \"prefix\", \"announced\": true}}";

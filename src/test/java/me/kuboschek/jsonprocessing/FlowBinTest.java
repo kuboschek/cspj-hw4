@@ -1,10 +1,14 @@
-package com.rubin.jsonprocessing;
+package me.kuboschek.jsonprocessing;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import static org.junit.Assert.assertEquals;
 import org.junit.Test;
+
+import me.kuboschek.jsonprocessing.Flow;
+import me.kuboschek.jsonprocessing.FlowBin;
+import me.kuboschek.jsonprocessing.Quantile;
 
 /**
  *

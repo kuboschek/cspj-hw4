@@ -1,4 +1,4 @@
-package com.rubin.jsonprocessing;
+package me.kuboschek.jsonprocessing;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -184,7 +184,7 @@ public class App {
                 	}
                 	
                 	// Keep user informed
-                	System.out.print(String.format("\r%d of %d, %d annotations / s", done, tasks_submitted, done - old_value));
+                	System.out.print(String.format("\r%d of %d\t\t\t%d annotations/s", done, tasks_submitted, done - old_value));
                 	
                 	old_value = done;
                 }

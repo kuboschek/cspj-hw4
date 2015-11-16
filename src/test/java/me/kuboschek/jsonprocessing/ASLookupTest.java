@@ -1,8 +1,11 @@
-package com.rubin.jsonprocessing;
+package me.kuboschek.jsonprocessing;
 
 import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
+
+import me.kuboschek.jsonprocessing.ASInfo;
+import me.kuboschek.jsonprocessing.ASLookup;
 
 public class ASLookupTest {
 	@Test

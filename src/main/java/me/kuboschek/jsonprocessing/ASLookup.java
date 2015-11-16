@@ -1,4 +1,4 @@
-package com.rubin.jsonprocessing;
+package me.kuboschek.jsonprocessing;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
