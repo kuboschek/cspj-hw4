@@ -4,12 +4,12 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 public class ASLookup implements Callable<ASInfo> {
-	private static Map<String, ASInfo> cache = new ConcurrentSkipListMap<>();
+	private static Map<String, ASInfo> cache = new HashMap<>();
 	private String queryIP;
 	
 	private static final String baseURL = "https://stat.ripe.net/data/prefix-overview/data.json";
