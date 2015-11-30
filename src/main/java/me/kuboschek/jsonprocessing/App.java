@@ -11,6 +11,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -48,6 +49,15 @@ public class App {
         // Create group map
         Map<String, FlowBin> groups = new HashMap<>();
 
+        // Load stored AS infos from file database into memory cache
+        try {
+    		Class.forName("org.sqlite.JDBC");
+			ASLookup.populateCache();
+		} catch (SQLException | ClassNotFoundException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+        
         // Create a thread pool for annotating objects in parallel
         ExecutorService svc = Executors.newFixedThreadPool(15);
 

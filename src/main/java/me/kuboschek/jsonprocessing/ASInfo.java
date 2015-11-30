@@ -4,7 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 public class ASInfo {
-	int number;
+	long number;
 	String holder;
 	String block;
 	
@@ -12,7 +12,7 @@ public class ASInfo {
 	
 	private ASInfo(){};
 	
-	private ASInfo(int number) {
+	ASInfo(long number) {
 		this.number = number;
 	}
 	
