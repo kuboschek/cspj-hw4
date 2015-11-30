@@ -8,12 +8,19 @@ public class ASInfo {
 	String holder;
 	String block;
 	
-	public static ASInfo NULL_INFO = new ASInfo(-1);
+	public static ASInfo NULL_INFO = new ASInfo(-1, "", "");
 	
 	private ASInfo(){};
 	
 	ASInfo(long number) {
 		this.number = number;
+	}
+	
+	private ASInfo(long number, String holder, String block) {
+		this(number);
+		
+		this.holder = holder;
+		this.block = block;
 	}
 	
 	/**

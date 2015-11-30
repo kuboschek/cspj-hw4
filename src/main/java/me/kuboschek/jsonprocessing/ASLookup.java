@@ -6,6 +6,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -95,19 +96,21 @@ public class ASLookup implements Callable<ASInfo> {
 		db.close();
 	}
 	
-	public static void saveCache(String queryIP, ASInfo info) throws SQLException, ClassNotFoundException{
+	public static synchronized void saveCache(String queryIP, ASInfo info) throws SQLException, ClassNotFoundException{
 		initDatabase();
 		
 		Connection db = DriverManager.getConnection("jdbc:sqlite:" + dbName);
-		Statement stmt = null;
+		PreparedStatement stmt = null;
 		
 		
-		stmt = db.createStatement();
-		// TODO Save cache to db file
-		String sql = "INSERT INTO 'as' VALUES " +
-		String.format("('%s', '%s', %d, '%s');", queryIP, info.block, info.number, info.holder);
+		stmt = db.prepareStatement("INSERT INTO 'as' values (?, ?, ?, ?);");
+		
+		stmt.setString(1, queryIP);
+		stmt.setString(2, info.block);
+		stmt.setLong(3, info.number);
+		stmt.setString(4, info.holder);
 			
-		stmt.executeUpdate(sql);
+		stmt.executeUpdate();
 		stmt.close();
 		
 		db.close();
@@ -146,13 +149,12 @@ public class ASLookup implements Callable<ASInfo> {
 		}
 		
 		// Cache the result even if there is no AS
-		if(info != null) {
-			cache.put(queryIP, info);
-			saveCache(queryIP, info);
-		} else {
-			cache.put(queryIP, ASInfo.NULL_INFO);
-			saveCache(queryIP, ASInfo.NULL_INFO);
-		}
+		if(info == null)
+			info = ASInfo.NULL_INFO;
+		
+		cache.put(queryIP, info);
+		saveCache(queryIP, info);
+
 		
 		return info;
 	}

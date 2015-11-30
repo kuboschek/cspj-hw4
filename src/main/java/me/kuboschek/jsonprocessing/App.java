@@ -199,7 +199,6 @@ public class App {
                 	old_value = done;
                 }
                 
-                System.out.println();
                 System.out.println("All flows annotated. Grouping flows.");
 
                 // This flow grouper is arbitrary in implementation
@@ -245,6 +244,7 @@ public class App {
                     reader.close();
                 }
                 System.out.println("File: " + arg + " done!");
+                System.out.println();
             }
         }
 
