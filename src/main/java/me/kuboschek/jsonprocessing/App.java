@@ -11,7 +11,11 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -40,14 +44,10 @@ public class App {
         Map<String, FlowFilter> filters = new LinkedHashMap<>();
         addFilters(filters);
 
-        // For each filter create a correcponding TreeMap to store all the timed bins
-        // The key is the same as that of the filter.
-        Map<String, TreeMap<Long, FlowBin>> binObjects = new LinkedHashMap<>();
+        // For each filter create a map from groups to a map of timed flow bins
+        Map<String, Map<String, TreeMap<Long, FlowBin>>> binObjects = new LinkedHashMap<>();
         // Create a TreeMap<Long, Flowbin> for every filter
         createBinTreeMap(filters, binObjects);
-
-        // Create group map
-        Map<String, FlowBin> groups = new HashMap<>();
 
         // Load stored AS infos from file database into memory cache
         try {
@@ -63,6 +63,33 @@ public class App {
 
         System.out.println(String.format("Processing %d file(s)", args.length));
 
+
+        
+        // This flow grouper is arbitrary in implementation
+        FlowGrouper aspair  = new FlowGrouper() {
+            @Override
+            public String getKey(Flow f) {
+                try {
+                    ASInfo srcas = (ASInfo) f.getAnnotation("src-as");
+                    ASInfo dstas = (ASInfo) f.getAnnotation("dst-as");
+
+                    if(srcas == null || dstas == null) {
+                        return "none";
+                    }
+
+                    return String.format("%s-%s", srcas != null ? srcas.number : "?", dstas != null ? dstas.number : "?");
+                } catch (ClassCastException ex) {
+                    return "none";
+                }
+            }
+            
+            @Override
+            public String getName() {
+            	return "as";
+            }
+        };
+        
+        
         for (String arg : args) {
             // Persist flows here, to group them after annotation
             List<Flow> flows = new ArrayList<>();
@@ -91,7 +118,41 @@ public class App {
 
                     // Add to list for grouping later
                     flows.add(flow);
+                }
+                reader.endArray();
+                
+                
+                System.out.println(String.format("%d flows queued for annotation", num_flows));
+                
+                
+                int old_value = 0;
+                
+                // Wait for annotation to be completed
+                while(!svc.isShutdown()) {
+                	try {
+						if(svc.awaitTermination(1, TimeUnit.SECONDS))
+							break;
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+ 
+                	ThreadPoolExecutor tpe = (ThreadPoolExecutor) svc;
+                	int done = tasks_submitted - tpe.getQueue().size();
+                	
+                	if(tasks_submitted - done == 0) {
+                		break;
+                	}
+                	
+                	// Keep user informed
+                	System.out.print(String.format("\r%10d of %d\t%5d annotations/s", done, tasks_submitted, done - old_value));
+                	
+                	old_value = done;
+                }
+                
 
+                
+                // Run the flow pipeline oll all the flows in this file, which are now annotated.
+                for (Flow flow : flows) {
                     // Get the start time of a flow, parse it and convert it 
                     // into milliseconds for more precision
                     LocalDateTime flowStartTime = LocalDateTime.parse(flow.getStart(),
@@ -112,7 +173,17 @@ public class App {
                     for (Map.Entry<String, FlowFilter> stringFilter : filters.entrySet()) {
                         // Apply filter
                         if (stringFilter.getValue().test(flow)) {
-                            TreeMap<Long, FlowBin> treeMap = binObjects.get(stringFilter.getKey());
+                            Map<String, TreeMap<Long, FlowBin>> groups = binObjects.get(stringFilter.getKey());
+                            
+                            // Get the right map for the group
+                            TreeMap<Long, FlowBin> treeMap = groups.get(aspair.getKey(flow));
+                            
+                            // Create and store one if it doesn't exist
+                            if(treeMap == null) {
+                            	treeMap = new TreeMap<>();
+                            	groups.put(aspair.getKey(flow), treeMap);
+                            }
+                            
                             // Get the first entry that matches the start time of 
                             // the flow
                             Entry<Long, FlowBin> longBin = treeMap.floorEntry(startTime);
@@ -170,70 +241,6 @@ public class App {
                         }
                     }
                 }
-                reader.endArray();
-                
-                System.out.println(String.format("%d flows queued for annotation", num_flows));
-                
-                
-                int old_value = 0;
-                
-                // Wait for annotation to be completed
-                while(!svc.isShutdown()) {
-                	try {
-						if(svc.awaitTermination(1, TimeUnit.SECONDS))
-							break;
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
- 
-                	ThreadPoolExecutor tpe = (ThreadPoolExecutor) svc;
-                	int done = tasks_submitted - tpe.getQueue().size();
-                	
-                	if(tasks_submitted - done == 0) {
-                		break;
-                	}
-                	
-                	// Keep user informed
-                	System.out.print(String.format("\r%10d of %d\t%5d annotations/s", done, tasks_submitted, done - old_value));
-                	
-                	old_value = done;
-                }
-                
-                System.out.println("All flows annotated. Grouping flows.");
-
-                // This flow grouper is arbitrary in implementation
-                FlowGrouper aspair  = new FlowGrouper() {
-                    @Override
-                    public String getKey(Flow f) {
-                        try {
-                            ASInfo srcas = (ASInfo) f.getAnnotation("src-as");
-                            ASInfo dstas = (ASInfo) f.getAnnotation("dst-as");
-
-                            if(srcas == null || dstas == null) {
-                                return "none";
-                            }
-
-                            return String.format("%d-%d", srcas.number, dstas.number);
-                        } catch (ClassCastException ex) {
-                            return "none";
-                        }
-                    }
-                };
-
-                // Iterating through all flows, generating groups
-                for(Flow f : flows) {
-                    String key = aspair.getKey(f);
-
-                    if (groups.containsKey(key)) {
-                        groups.get(key).addFlow(f);
-                    } else {
-                        FlowBin fb = new FlowBin(0, Long.MAX_VALUE);
-                        fb.addFlow(f);
-
-                        groups.put(key, fb);
-                    }
-                }
-
 
             } catch (FileNotFoundException e) {
                 e.printStackTrace(System.out);
@@ -247,15 +254,17 @@ public class App {
                 System.out.println();
             }
         }
-
-        System.out.println(String.format("%d flow groups generated.", groups.size()));
-
-        // Write flow bin stats output to file
-        writeToFile(binObjects);
-
-        // Write flow groups stats to files
-        groupsToFile(groups);
-
+        
+        for(Map.Entry<String, Map<String, TreeMap<Long, FlowBin>>> filterMap : binObjects.entrySet()) {
+			try {
+				System.out.println("Writing records for " + filterMap.getKey() + " to database.");
+				writeDatabaseTable(filterMap, filterMap.getKey() + "_flows_by_" + aspair.getName());
+			} catch (ClassNotFoundException | SQLException e) {
+				e.printStackTrace();
+			}
+        }
+        
+        
         System.exit(0);
     }
 
@@ -312,107 +321,167 @@ public class App {
         });
     }
 
+    // Pre-populate the map with entries for all filters. Entries for groups are created when needed
     private static void createBinTreeMap(Map<String, FlowFilter> filters,
-            Map<String, TreeMap<Long, FlowBin>> aggregateObjects) {
+    		Map<String, Map<String, TreeMap<Long, FlowBin>>> aggregateObjects) {
         for (Map.Entry<String, FlowFilter> entry : filters.entrySet()) {
-            TreeMap<Long, FlowBin> treeMap = new TreeMap<>();
+            Map<String, TreeMap<Long, FlowBin>> treeMap = new TreeMap<>();
             aggregateObjects.put(entry.getKey(), treeMap);
         }
     }
 
+    private static void writeDatabaseTable(Map.Entry<String, Map<String, TreeMap<Long, FlowBin>>> filterGroups, String tableName) throws ClassNotFoundException, SQLException {    	
+    	// Open database connection
+		Class.forName("org.sqlite.JDBC");
+        Connection dbConn = DriverManager.getConnection("jdbc:sqlite:flows.db");
+        
+		// Create table if not existant
+	    Statement stmt = dbConn.createStatement();
+	    String sql =  	"CREATE TABLE IF NOT EXISTS " + tableName + "(time INTEGER not NULL,"
+					+	"\"group\" VARCHAR(255),"
+					+	"type VARCHAR(4) not NULL,"
+					+	"min INTEGER not NULL,"
+					+	"q1 INTEGER not NULL,"
+					+	"median INTEGER not NULL,"
+					+	"q3 INTEGER not NULL,"
+					+	"max INTEGER not NULL,"
+					+	"size INTEGER not NULL,"
+					+	"sum INTEGER not NULL);";
+	    stmt.executeUpdate(sql);
+    	
+		// Prepare statement for inserting lots of things
+    	PreparedStatement insert = null;
+        insert = dbConn.prepareStatement("INSERT INTO '" + tableName + "' values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+
+        // Go through all groups, writing them to the same file
+        for(Map.Entry<String, TreeMap<Long, FlowBin>> entry : filterGroups.getValue().entrySet()) {
+        	String groupName = entry.getKey();
+        	
+            TreeMap<Long, FlowBin> treeMap = entry.getValue();
+            for (Long seconds : treeMap.navigableKeySet()) {
+            	
+                FlowBin bin = treeMap.get(seconds);
+                // Getting quantile objects of the corresponding FlowBin
+                Quantile octs = bin.getOctsStats();
+                Quantile pkts = bin.getPktsStats();
+                Quantile rocts = bin.getRoctsStats();
+                Quantile rpkts = bin.getRpktsStats();
+                
+                
+                // Insert into the table
+                insert.setLong(1, seconds / 1000);
+                insert.setString(2, groupName);
+                
+                
+                // Octets
+                insert.setString(3, "octs");
+                insert.setLong(4, octs.getMin());
+                insert.setLong(5, octs.getFirstQuantile());
+                insert.setLong(6, octs.getMedian());
+                insert.setLong(7, octs.getThirdQuantile());
+                insert.setLong(8, octs.getMax());
+                insert.setLong(9, octs.getSize());
+                insert.setLong(10, octs.getSum());
+                
+                insert.executeUpdate();
+                
+                
+                // Octets
+                insert.setString(3, "pkts");
+                insert.setLong(4, pkts.getMin());
+                insert.setLong(5, pkts.getFirstQuantile());
+                insert.setLong(6, pkts.getMedian());
+                insert.setLong(7, pkts.getThirdQuantile());
+                insert.setLong(8, pkts.getMax());
+                insert.setLong(9, pkts.getSize());
+                insert.setLong(10, pkts.getSum());
+                
+                insert.executeUpdate();
+                
+                
+                // Octets
+                insert.setString(3, "rocts");
+                insert.setLong(4, rocts.getMin());
+                insert.setLong(5, rocts.getFirstQuantile());
+                insert.setLong(6, rocts.getMedian());
+                insert.setLong(7, rocts.getThirdQuantile());
+                insert.setLong(8, rocts.getMax());
+                insert.setLong(9, rocts.getSize());
+                insert.setLong(10, rocts.getSum());
+                
+                insert.executeUpdate();
+                
+                
+                // Octets
+                insert.setString(3, "rpkts");
+                insert.setLong(4, rpkts.getMin());
+                insert.setLong(5, rpkts.getFirstQuantile());
+                insert.setLong(6, rpkts.getMedian());
+                insert.setLong(7, rpkts.getThirdQuantile());
+                insert.setLong(8, rpkts.getMax());
+                insert.setLong(9, rpkts.getSize());
+                insert.setLong(10, rpkts.getSum());
+                
+                insert.executeUpdate();
+
+            }
+        }
+    }
+    
+    
     // Just prints the results aggregated into the FlowBins according to the
     // specified format
-    private static void writeToFile(Map<String, TreeMap<Long, FlowBin>> binObjects) {
-        for (Map.Entry<String, TreeMap<Long, FlowBin>> entry : binObjects.entrySet()) {
+    private static void writeToFile(Map<String, Map<String, TreeMap<Long, FlowBin>>> binObjects, String groupingName) {
+        for (Map.Entry<String, Map<String, TreeMap<Long, FlowBin>>> filterGroups : binObjects.entrySet()) {
             PrintWriter writer = null;
             try {
-                File file = new File(entry.getKey() + ".dat");
+                File file = new File(filterGroups.getKey() + "_by_" + groupingName + ".dat");
                 if (!file.exists()) {
                     file.createNewFile();
                 }
 
                 writer = new PrintWriter(new BufferedWriter(new FileWriter(file, false)));
                 // The header of every file
-                writer.printf("#%-9s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\n", "time", "type", "min", "q1", "median", "q2", "max", "size", "sum");
-                TreeMap<Long, FlowBin> treeMap = entry.getValue();
-                for (Long seconds : treeMap.navigableKeySet()) {
-                    FlowBin bin = treeMap.get(seconds);
-                    // Getting quantile objects of the corresponding FlowBin
-                    Quantile octs = bin.getOctsStats();
-                    Quantile pkts = bin.getPktsStats();
-                    Quantile rocts = bin.getRoctsStats();
-                    Quantile rpkts = bin.getRpktsStats();
-                    // Printing the formated output for every Quantile object of
-                    // the FlowBin
-                    writer.printf("%-10d\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n", 
-                            seconds / 1000, "octs", octs.getMin(), octs.getFirstQuantile(), octs.getMedian()
-                            , octs.getThirdQuantile(), octs.getMax(), octs.getSize(), octs.getSum());
-                    writer.printf("%-10d\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n", 
-                            seconds / 1000, "pkts", pkts.getMin(), pkts.getFirstQuantile(), pkts.getMedian(), 
-                            pkts.getThirdQuantile(), pkts.getMax(), pkts.getSize(), pkts.getSum());
-                    writer.printf("%-10d\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n", 
-                            seconds / 1000, "rocts", rocts.getMin(), rocts.getFirstQuantile(), rocts.getMedian(), 
-                            rocts.getThirdQuantile(), rocts.getMax(), rocts.getSize(), rocts.getSum());
-                    writer.printf("%-10d\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n", 
-                            seconds / 1000, "rpkts", rpkts.getMin(), rpkts.getFirstQuantile(), rpkts.getMedian(), 
-                            rpkts.getThirdQuantile(), rpkts.getMax(), rpkts.getSize(), rpkts.getSum());
+                writer.printf("#%-9s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\n", "time", "group", "type", "min", "q1", "median", "q2", "max", "size", "sum");
+                
+                // Go through all groups, writing them to the same file
+                for(Map.Entry<String, TreeMap<Long, FlowBin>> entry : filterGroups.getValue().entrySet()) {
+                	String groupName = entry.getKey();
+                	
+	                TreeMap<Long, FlowBin> treeMap = entry.getValue();
+	                for (Long seconds : treeMap.navigableKeySet()) {
+	                	
+	                    FlowBin bin = treeMap.get(seconds);
+	                    // Getting quantile objects of the corresponding FlowBin
+	                    Quantile octs = bin.getOctsStats();
+	                    Quantile pkts = bin.getPktsStats();
+	                    Quantile rocts = bin.getRoctsStats();
+	                    Quantile rpkts = bin.getRpktsStats();
+	                    // Printing the formated output for every Quantile object of
+	                    // the FlowBin
+	                    writer.printf("%-10d\t%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n", 
+	                            seconds / 1000, groupName, "octs", octs.getMin(), octs.getFirstQuantile(), octs.getMedian()
+	                            , octs.getThirdQuantile(), octs.getMax(), octs.getSize(), octs.getSum());
+	                    writer.printf("%-10d\t%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n", 
+	                            seconds / 1000, groupName, "pkts", pkts.getMin(), pkts.getFirstQuantile(), pkts.getMedian(), 
+	                            pkts.getThirdQuantile(), pkts.getMax(), pkts.getSize(), pkts.getSum());
+	                    writer.printf("%-10d\t%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n", 
+	                            seconds / 1000, groupName, "rocts", rocts.getMin(), rocts.getFirstQuantile(), rocts.getMedian(), 
+	                            rocts.getThirdQuantile(), rocts.getMax(), rocts.getSize(), rocts.getSum());
+	                    writer.printf("%-10d\t%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n", 
+	                            seconds / 1000, groupName, "rpkts", rpkts.getMin(), rpkts.getFirstQuantile(), rpkts.getMedian(), 
+	                            rpkts.getThirdQuantile(), rpkts.getMax(), rpkts.getSize(), rpkts.getSum());
+	                }
+	                
+	                writer.write("\n");
+                
                 }
-                writer.write("\n");
             } catch (IOException e) {
                 e.printStackTrace(System.out);
             } finally {
                 if (writer != null) {
                     writer.close();
                 }
-            }
-        }
-    }
-
-    private static void groupsToFile(Map<String, FlowBin> groupBins) {
-        PrintWriter writer = null;
-
-        try {
-            File file = new File("groups.dat");
-
-            if (!file.exists()) {
-                file.createNewFile();
-            }
-
-            writer = new PrintWriter(new BufferedWriter(new FileWriter(file, false)));
-            // The header of every file
-            writer.printf("#%-9s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\t%-10s\n",
-                    "group", "type", "min", "q1", "median", "q2", "max", "size", "sum");
-
-            for (Map.Entry<String, FlowBin> entry : groupBins.entrySet()) {
-                String group = entry.getKey();
-                FlowBin bin = entry.getValue();
-                // Getting quantile objects of the corresponding FlowBin
-                Quantile octs = bin.getOctsStats();
-                Quantile pkts = bin.getPktsStats();
-                Quantile rocts = bin.getRoctsStats();
-                Quantile rpkts = bin.getRpktsStats();
-                // Printing the formated output for every Quantile object of
-                // the FlowBin
-                writer.printf("%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
-                        group, "octs", octs.getMin(), octs.getFirstQuantile(), octs.getMedian()
-                        , octs.getThirdQuantile(), octs.getMax(), octs.getSize(), octs.getSum());
-                writer.printf("%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
-                        group, "pkts", pkts.getMin(), pkts.getFirstQuantile(), pkts.getMedian(),
-                        pkts.getThirdQuantile(), pkts.getMax(), pkts.getSize(), pkts.getSum());
-                writer.printf("%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
-                        group, "rocts", rocts.getMin(), rocts.getFirstQuantile(), rocts.getMedian(),
-                        rocts.getThirdQuantile(), rocts.getMax(), rocts.getSize(), rocts.getSum());
-                writer.printf("%-10s\t%-10s\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-10d\t%-20d\n",
-                        group, "rpkts", rpkts.getMin(), rpkts.getFirstQuantile(), rpkts.getMedian(),
-                        rpkts.getThirdQuantile(), rpkts.getMax(), rpkts.getSize(), rpkts.getSum());
-            }
-
-            writer.write("\n");
-        } catch (IOException e) {
-            e.printStackTrace(System.out);
-        } finally {
-            if (writer != null) {
-                writer.close();
             }
         }
     }

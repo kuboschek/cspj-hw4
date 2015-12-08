@@ -15,7 +15,7 @@
 	FlowBin.java --- Class that can aggregate the (pkt, oct, rpkt, rock) of
 		several Flow objects in a given time interval
 	FlowBinTest.java --- Class that provides unit test cases for the FlowBin class
-	
+
 	Quantile.java --- Class that provides statistical summaries of a list of numbers
 	QuantileTest.java --- Class that provides unit test cases for the Quantile class
 
@@ -39,22 +39,22 @@
 
 
 ## Output
+AS cache files:
+```
+	ripe.db
+```
+
 Filter output files:
 ```
-	HTTP_HTTPS.dat
-	QUICK_QUICKS.dat
-	TCP.dat
-	UDP.dat
-	ICMPv6.dat
-	OTHER.dat
+	flows.db
 ```
 
 Every one of the above files contains statistical summaries for each of the filters
 that are specified in the program. If more filters would be specified there would be
-more files. (1 file/filter)
+more files. (1 file per filter and group combo)
 
-The application also outputs ```groups.dat```, which contains statistical summaries
-of all flow groups that have been created from the input files.
+```flows.db````contains a database with all the flow record groups in separate
+tables per filter.
 
 
 
@@ -68,7 +68,7 @@ of all flow groups that have been created from the input files.
 	```java -jar target/jsonProcessing-1.0.jar [files to be processed]```
 
 Clean the maven generated files: mvn clean
-Clean the produced files: rm *.dat
+Clean the produced files: rm *.db
 
 The app will generate files as specified above.
 
